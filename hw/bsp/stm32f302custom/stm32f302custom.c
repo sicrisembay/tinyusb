@@ -62,15 +62,6 @@ void USBWakeUp_RMP_IRQHandler(void)
 // MACRO TYPEDEF CONSTANT ENUM
 //--------------------------------------------------------------------+
 
-#define LED_PORT              GPIOE
-#define LED_PIN               GPIO_PIN_9
-#define LED_STATE_ON          1
-
-#define BUTTON_PORT           GPIOA
-#define BUTTON_PIN            GPIO_PIN_0
-#define BUTTON_STATE_ACTIVE   1
-
-
 /**
   * @brief  System Clock Configuration
   *         The system Clock is configured as follow :
@@ -124,54 +115,38 @@ static void SystemClock_Config(void)
 
 void board_init(void)
 {
-  SystemClock_Config();
+    GPIO_InitTypeDef GPIO_InitStruct;
+    SystemClock_Config();
 
-  #if CFG_TUSB_OS  == OPT_OS_NONE
-  // 1ms tick timer
-  SysTick_Config(SystemCoreClock / 1000);
-  #endif
+#if CFG_TUSB_OS  == OPT_OS_NONE
+    // 1ms tick timer
+    SysTick_Config(SystemCoreClock / 1000);
+#endif
 
-  // Remap the USB interrupts
-  __HAL_RCC_SYSCFG_CLK_ENABLE();
-  __HAL_REMAPINTERRUPT_USB_ENABLE();
+    // Remap the USB interrupts
+    __HAL_RCC_SYSCFG_CLK_ENABLE();
+    __HAL_REMAPINTERRUPT_USB_ENABLE();
 
-  // LED
-  __HAL_RCC_GPIOE_CLK_ENABLE();
-  GPIO_InitTypeDef  GPIO_InitStruct;
-  GPIO_InitStruct.Pin = LED_PIN;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(LED_PORT, &GPIO_InitStruct);
+    /* Configure USB DM and DP pins */
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    GPIO_InitStruct.Pin = (GPIO_PIN_11 | GPIO_PIN_12);
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF14_USB;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  // Button
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  GPIO_InitStruct.Pin = BUTTON_PIN;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(BUTTON_PORT, &GPIO_InitStruct);
+    /* USB Pull resistor */
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    GPIO_InitStruct.Pin = GPIO_PIN_15;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, 1);
 
-  /* Configure USB DM and DP pins */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  GPIO_InitStruct.Pin = (GPIO_PIN_11 | GPIO_PIN_12);
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF14_USB;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /* USB Pull resistor */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  GPIO_InitStruct.Pin = GPIO_PIN_15;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, 1);
-  
-  // Enable USB clock
-  __HAL_RCC_USB_CLK_ENABLE();
+    // Enable USB clock
+    __HAL_RCC_USB_CLK_ENABLE();
 }
 
 //--------------------------------------------------------------------+
@@ -180,42 +155,43 @@ void board_init(void)
 
 void board_led_write(bool state)
 {
-  HAL_GPIO_WritePin(LED_PORT, LED_PIN, state ? LED_STATE_ON : (1-LED_STATE_ON));
+    (void)state;
 }
 
 uint32_t board_button_read(void)
 {
-  return BUTTON_STATE_ACTIVE == HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN);
+    return 0;
 }
 
 int board_uart_read(uint8_t* buf, int len)
 {
-  (void) buf; (void) len;
-  return 0;
+    (void) buf; (void) len;
+    return 0;
 }
 
 int board_uart_write(void const * buf, int len)
 {
-  (void) buf; (void) len;
-  return 0;
+    (void) buf;
+    (void) len;
+    return 0;
 }
 
 #if CFG_TUSB_OS  == OPT_OS_NONE
 volatile uint32_t system_ticks = 0;
 void SysTick_Handler (void)
 {
-  system_ticks++;
+    system_ticks++;
 }
 
 uint32_t board_millis(void)
 {
-  return system_ticks;
+    return system_ticks;
 }
 #endif
 
 void HardFault_Handler (void)
 {
-  asm("bkpt");
+    asm("bkpt");
 }
 
 // Required by __libc_init_array in startup code if we are compiling using
