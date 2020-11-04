@@ -27,6 +27,12 @@
 #include "../board.h"
 #include "stm32f3xx_hal.h"
 
+#define BOARD_UART_ENABLE           (1)
+
+#if (BOARD_UART_ENABLE == 1)
+static UART_HandleTypeDef huart1;
+#endif
+
 //--------------------------------------------------------------------+
 // Forward USB interrupt events to TinyUSB IRQ Handler
 //--------------------------------------------------------------------+
@@ -94,12 +100,6 @@ static void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
   HAL_RCC_OscConfig(&RCC_OscInitStruct);
 
-  /* Configures the USB clock */
-  HAL_RCCEx_GetPeriphCLKConfig(&RCC_PeriphClkInit);
-  RCC_PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
-  RCC_PeriphClkInit.USBClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
-  HAL_RCCEx_PeriphCLKConfig(&RCC_PeriphClkInit);
-
   /* Select PLL as system clock source and configure the HCLK, PCLK1 and PCLK2
   clocks dividers */
   RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2);
@@ -108,6 +108,17 @@ static void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
   HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
+
+  /* Configures the USB clock */
+  HAL_RCCEx_GetPeriphCLKConfig(&RCC_PeriphClkInit);
+#if (BOARD_UART_ENABLE == 1)
+  RCC_PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB|RCC_PERIPHCLK_USART1;
+  RCC_PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
+#else
+  RCC_PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
+#endif
+  RCC_PeriphClkInit.USBClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
+  HAL_RCCEx_PeriphCLKConfig(&RCC_PeriphClkInit);
 
   /* Enable Power Clock */
   __HAL_RCC_PWR_CLK_ENABLE();
@@ -121,11 +132,43 @@ void board_init(void)
 #if CFG_TUSB_OS  == OPT_OS_NONE
     // 1ms tick timer
     SysTick_Config(SystemCoreClock / 1000);
+#elif (CFG_TUSB_OS == OPT_OS_FREERTOS)
+    NVIC_SetPriority(USB_HP_CAN_TX_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
+    NVIC_SetPriority(USB_LP_CAN_RX0_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
+    NVIC_SetPriority(USBWakeUp_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
 #endif
 
     // Remap the USB interrupts
     __HAL_RCC_SYSCFG_CLK_ENABLE();
     __HAL_REMAPINTERRUPT_USB_ENABLE();
+
+#if (BOARD_UART_ENABLE == 1)
+    /* Configure UART */
+    __HAL_RCC_USART1_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    /**USART1 GPIO Configuration
+    PB6     ------> USART1_TX
+    PB7     ------> USART1_RX
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    huart1.Instance = USART1;
+    huart1.Init.BaudRate = 115200;
+    huart1.Init.WordLength = UART_WORDLENGTH_8B;
+    huart1.Init.StopBits = UART_STOPBITS_1;
+    huart1.Init.Parity = UART_PARITY_NONE;
+    huart1.Init.Mode = UART_MODE_TX_RX;
+    huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+    huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+    huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+    HAL_UART_Init(&huart1);
+#endif
 
     /* Configure USB DM and DP pins */
     __HAL_RCC_GPIOA_CLK_ENABLE();
@@ -171,9 +214,8 @@ int board_uart_read(uint8_t* buf, int len)
 
 int board_uart_write(void const * buf, int len)
 {
-    (void) buf;
-    (void) len;
-    return 0;
+    HAL_UART_Transmit(&huart1, (uint8_t*) buf, len, 0xffff);
+    return len;
 }
 
 #if CFG_TUSB_OS  == OPT_OS_NONE
