@@ -122,6 +122,11 @@ static void SystemClock_Config(void)
 
   /* Enable Power Clock */
   __HAL_RCC_PWR_CLK_ENABLE();
+
+  __HAL_RCC_SYSCFG_CLK_ENABLE();
+
+  // Enable USB clock
+  __HAL_RCC_USB_CLK_ENABLE();
 }
 
 void board_init(void)
@@ -132,15 +137,27 @@ void board_init(void)
 #if CFG_TUSB_OS  == OPT_OS_NONE
     // 1ms tick timer
     SysTick_Config(SystemCoreClock / 1000);
-#elif (CFG_TUSB_OS == OPT_OS_FREERTOS)
+#endif
+
+#ifdef SYSCFG_CFGR1_USB_IT_RMP
+    // Remap the USB interrupts
+    __HAL_REMAPINTERRUPT_USB_ENABLE();
+
+#if (CFG_TUSB_OS == OPT_OS_FREERTOS)
+    NVIC_SetPriority(USB_HP_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
+    NVIC_SetPriority(USB_LP_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
+    NVIC_SetPriority(USBWakeUp_RMP_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
+#endif /* CFG_TUSB_OS == OPT_OS_FREERTOS */
+
+#else
+
+#if (CFG_TUSB_OS == OPT_OS_FREERTOS)
     NVIC_SetPriority(USB_HP_CAN_TX_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
     NVIC_SetPriority(USB_LP_CAN_RX0_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
     NVIC_SetPriority(USBWakeUp_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
-#endif
+#endif /* CFG_TUSB_OS == OPT_OS_FREERTOS */
 
-    // Remap the USB interrupts
-    __HAL_RCC_SYSCFG_CLK_ENABLE();
-    __HAL_REMAPINTERRUPT_USB_ENABLE();
+#endif /* SYSCFG_CFGR1_USB_IT_RMP */
 
 #if (BOARD_UART_ENABLE == 1)
     /* Configure UART */
@@ -186,15 +203,33 @@ void board_init(void)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, 1);
-
-    // Enable USB clock
-    __HAL_RCC_USB_CLK_ENABLE();
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, 0);
 }
 
 //--------------------------------------------------------------------+
 // Board porting API
 //--------------------------------------------------------------------+
+
+void board_dplus_pull_up(bool state)
+{
+    if(state) {
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, 1);
+    } else {
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, 0);
+    }
+}
+
+void dcd_connect(uint8_t rhport)
+{
+    (void)rhport;
+    board_dplus_pull_up(true);
+}
+
+void dcd_disconnect(uint8_t rhport)
+{
+    (void)rhport;
+    board_dplus_pull_up(false);
+}
 
 void board_led_write(bool state)
 {
