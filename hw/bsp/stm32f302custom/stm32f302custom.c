@@ -27,9 +27,7 @@
 #include "../board.h"
 #include "stm32f3xx_hal.h"
 
-#define BOARD_UART_ENABLE           (1)
-
-#if (BOARD_UART_ENABLE == 1)
+#if (CFG_TUSB_DEBUG >= 2)
 static UART_HandleTypeDef huart1;
 #endif
 
@@ -111,7 +109,7 @@ static void SystemClock_Config(void)
 
   /* Configures the USB clock */
   HAL_RCCEx_GetPeriphCLKConfig(&RCC_PeriphClkInit);
-#if (BOARD_UART_ENABLE == 1)
+#if (CFG_TUSB_DEBUG >= 2)
   RCC_PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB|RCC_PERIPHCLK_USART1;
   RCC_PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
 #else
@@ -159,7 +157,7 @@ void board_init(void)
 
 #endif /* SYSCFG_CFGR1_USB_IT_RMP */
 
-#if (BOARD_UART_ENABLE == 1)
+#if (CFG_TUSB_DEBUG >= 2)
     /* Configure UART */
     __HAL_RCC_USART1_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -249,8 +247,13 @@ int board_uart_read(uint8_t* buf, int len)
 
 int board_uart_write(void const * buf, int len)
 {
+#if (CFG_TUSB_DEBUG >= 2)
     HAL_UART_Transmit(&huart1, (uint8_t*) buf, len, 0xffff);
     return len;
+#else
+    (void) buf; (void) len;
+    return 0;
+#endif /* CFG_TUSB_DEBUG >= 2 */
 }
 
 #if CFG_TUSB_OS  == OPT_OS_NONE
