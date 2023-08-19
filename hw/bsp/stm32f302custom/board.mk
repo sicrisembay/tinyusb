@@ -26,6 +26,9 @@ SRC_C += \
   $(ST_HAL_DRIVER)/Src/stm32f3xx_hal_rcc_ex.c \
   $(ST_HAL_DRIVER)/Src/stm32f3xx_hal_gpio.c \
   $(ST_HAL_DRIVER)/Src/stm32f3xx_hal_uart.c \
+  $(ST_HAL_DRIVER)/Src/stm32f3xx_hal_tim.c \
+  $(ST_HAL_DRIVER)/Src/stm32f3xx_hal_tim_ex.c \
+  $(ST_HAL_DRIVER)/Src/stm32f3xx_hal_dma.c \
 
 SRC_S += \
   $(ST_CMSIS)/Source/Templates/gcc/startup_stm32f302xc.s
