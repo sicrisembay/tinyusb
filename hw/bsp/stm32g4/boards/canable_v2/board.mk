@@ -1,0 +1,11 @@
+MCU_VARIANT = stm32g431xx
+
+CFLAGS += \
+	-DSTM32G431xx \
+	-DHSI_VALUE=16000000
+
+# Linker
+LD_FILE_GCC = $(BOARD_PATH)/STM32G431C8Tx_FLASH.ld
+
+# For flash-jlink target
+JLINK_DEVICE = stm32g431c8
