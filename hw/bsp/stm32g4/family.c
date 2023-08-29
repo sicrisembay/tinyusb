@@ -67,7 +67,9 @@ void board_init(void) {
   __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
+#ifdef UART_DEV
   UART_CLK_EN();
+#endif
 
 #if CFG_TUSB_OS == OPT_OS_NONE
   // 1ms tick timer
@@ -95,12 +97,14 @@ void board_init(void) {
   board_led_write(false);
 
   // Button
+#if (defined(BUTTON_PORT) && defined(BUTTON_PIN))
   memset(&GPIO_InitStruct, 0, sizeof(GPIO_InitStruct));
   GPIO_InitStruct.Pin = BUTTON_PIN;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = BUTTON_STATE_ACTIVE ? GPIO_PULLDOWN : GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(BUTTON_PORT, &GPIO_InitStruct);
+#endif
 
 #ifdef UART_DEV
   // UART
@@ -164,7 +168,11 @@ void board_led_write(bool state) {
 }
 
 uint32_t board_button_read(void) {
+#if (defined(BUTTON_PORT) && defined(BUTTON_PIN))
   return BUTTON_STATE_ACTIVE == HAL_GPIO_ReadPin(BUTTON_PORT, BUTTON_PIN);
+#else
+  return 0;
+#endif
 }
 
 size_t board_get_unique_id(uint8_t id[], size_t max_len) {
